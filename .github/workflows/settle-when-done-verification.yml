@@ -1,0 +1,54 @@
+name: Settle when done verification
+on:
+  push:
+    branches: [verify/settle-when-done]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RAYON_NUM_THREADS: "2"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: feat/settle-when-done
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-ci-deps
+      - run: vp run check:changed 382f4b2c6c8e --concurrency 1 --timeout 600 2>&1 | tee verification-checks.log
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: settle-when-done-checks
+          path: verification-checks.log
+  scenario:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      RAYON_NUM_THREADS: "2"
+      CARGO_BUILD_JOBS: "2"
+      NODE_OPTIONS: --max-old-space-size=4096
+      T3CODE_BUNDLED_DEV: "0"
+      T3CODE_WEB_SOURCEMAP: "0"
+      T3_SCENARIO_INHERIT_ENV: RAYON_NUM_THREADS,CARGO_BUILD_JOBS,NODE_OPTIONS,T3CODE_BUNDLED_DEV,T3CODE_WEB_SOURCEMAP
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: feat/settle-when-done
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-ci-deps
+      - run: node apps/web/node_modules/playwright/cli.js install --with-deps --only-shell chromium
+      - run: vp run scenarios:prove scripts/scenarios/settle-when-done.e2e.ts --base 382f4b2c6c8e --head HEAD
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: settle-when-done-client-evidence
+          path: |
+            scripts/.e2e/prove/proof.*
+            scripts/.e2e/prove/base.json
+            scripts/.e2e/prove/head.json
+            scripts/.e2e/prove/**/*.png
+            scripts/.e2e/prove/**/*.webm
+            scripts/.e2e/prove/**/*.mp4
+          include-hidden-files: true
